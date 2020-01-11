@@ -1,0 +1,1 @@
+Must run as administrator to have access to fan readings!
