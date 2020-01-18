@@ -9,40 +9,38 @@ N_SAMPLES = 3
 FAN_ID = 5
 FAN_MIN_THRESHOLD = 400
 FAN_MAX_THRESHOLD = 2500
+FAN_COUNT = 3
+SAMPLE_DELAY = 0.5
 
 
 def main():
     if not is_admin():
         sys.exit("Must run as administrator!")
 
-    toaster = ToastNotifier()
     monitor = init_librehardwaremonitor()
 
     samples = []
-
     for _ in range(N_SAMPLES):
         sensors = read_sensors(monitor)
         status = fan_status(sensors)
-
         samples.append(status)
-
-        time.sleep(0.5)
+        time.sleep(SAMPLE_DELAY)
 
     if not all(samples):
-        toaster.show_toast(
-            "Fan warning!",
-            f"Erratic fan reading, restart PC to protect GPU",
-            threaded=True,
-            icon_path="fan.ico",
-            duration=3,
-        )
+        alert("Erratic fan reading, restart PC to protect GPU")
+        os.system("shutdown -t 0 -f")
+    else:
+        alert("Fans ok!")
 
-    while toaster.notification_active():
-        time.sleep(0.1)
+
+def alert(message):
+    ToastNotifier().show_toast(
+        "Fan status", message, threaded=False, icon_path="fan.ico", duration=2,
+    )
 
 
 def init_librehardwaremonitor():
-    clr.AddReference("librehardwaremonitor\LibreHardwareMonitorLib")
+    clr.AddReference(r"librehardwaremonitor\LibreHardwareMonitorLib")
     from LibreHardwareMonitor import Hardware
 
     handle = Hardware.Computer()
@@ -68,13 +66,12 @@ def read_sensors(monitor):
 
 
 def fan_status(sensors):
-    fans = [sensor for sensor in sensors if sensor.SensorType == FAN_ID]
+    fan_speeds = [sensor.Value for sensor in sensors if sensor.SensorType == FAN_ID]
 
-    return all(
-        [
-            fan.Value > FAN_MIN_THRESHOLD and fan.Value < FAN_MAX_THRESHOLD
-            for fan in fans
-        ]
+    print(fan_speeds)
+
+    return len(fan_speeds) == FAN_COUNT and all(
+        [rpm > FAN_MIN_THRESHOLD and rpm < FAN_MAX_THRESHOLD for rpm in fan_speeds]
     )
 
 
